@@ -13,9 +13,12 @@
     "Cd_f": 0.1,
     "Cna": 11.747,
     "Cmq": -3.0,
-    "vel_1st": 10,
-    "op_type_1st": 0,
-    "delay_time_1st": 0,
+    "parachutes": [
+      {
+        "op_height": 10,
+        "CdS": 7.0
+      }
+    ],
     "motor_file": "Sample_K240.txt",
     "thrust_measured_pressure": 101325,
     "engine_nozzle_diameter": 0,
@@ -33,7 +36,6 @@
       }
     ]
   },
-
   "environment": {
     "place": "nosiro_sea",
     "rail_len": 5.0,

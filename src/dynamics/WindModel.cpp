@@ -87,7 +87,7 @@ Vector3D applyPowerLow(const Vector3D& wind, double height) {
 
 WindModel::WindModel(double groundWindSpeed, double groundWindDirection, double magneticDeclination) :
     m_groundWindSpeed(groundWindSpeed),
-    m_groundWindDirection(normalizeAngle(groundWindDirection - magneticDeclination)) {
+    m_groundWindDirection(normalizeAngle(groundWindDirection + magneticDeclination)) {
     m_directionInterval = 270 - m_groundWindDirection;
     if (m_directionInterval <= -45.0) {
         m_directionInterval = 270 - m_groundWindDirection + 360;
@@ -118,7 +118,7 @@ WindModel::WindModel(double magneticDeclination) : m_groundWindSpeed(0.0), m_gro
     windfile.close();
 
     for (auto& wind : m_windData) {
-        wind.direction -= magneticDeclination;
+        wind.direction += magneticDeclination;
     }
 }
 

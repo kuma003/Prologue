@@ -118,7 +118,8 @@ void Solver::initializeRocket() {
     m_bodyDelta.velocity   = Vector3D(0, 0, 0);
     m_bodyDelta.omega_b    = Vector3D(0, 0, 0);
     m_bodyDelta.quat =
-        Quaternion(m_environment.railElevation, -(m_environment.railAzimuth - m_mapData.magneticDeclination) + 90);
+        Quaternion(m_environment.railElevation, -(m_environment.railAzimuth + m_mapData.magneticDeclination) + 90);
+	m_bodyDelta.parachuteOpenedList.resize(THIS_BODY_SPEC.parachutes.size(), false);
 
     THIS_BODY = m_bodyDelta;
 }
@@ -137,41 +138,38 @@ void Solver::update() {
 }
 
 void Solver::updateParachute() {
-    const bool detectpeakConditon =
-        THIS_BODY.maxAltitude > THIS_BODY.pos.z + AppSetting::Simulation::detectPeakThreshold;
+	// update max altitude
+    if (THIS_BODY.maxAltitude <= THIS_BODY.pos.z) {
+        THIS_BODY.maxAltitude     = THIS_BODY.pos.z;
+        THIS_BODY.maxAltitudeTime = THIS_BODY.elapsedTime;
+    } else {
+		THIS_BODY.detectPeak = true;
+	}
 
-    if (detectpeakConditon && !THIS_BODY.detectPeak) {
-        THIS_BODY.detectPeak = true;
-    }
 
-    if (THIS_BODY.parachuteOpened) {
-        return;
-    }
+	for (size_t i = 0; i < THIS_BODY_SPEC.parachutes.size(); i++) {
+		if (THIS_BODY.parachuteOpenedList[i]) continue;
+		Parachute para = THIS_BODY_SPEC.parachutes[i];
 
-    const bool detectpeak = THIS_BODY_SPEC.parachutes[0].openingType == ParachuteOpeningType::DetectPeak;
-
-    const bool fixedtime          = THIS_BODY_SPEC.parachutes[0].openingType == ParachuteOpeningType::FixedTime;
-    const bool fixedtimeCondition = THIS_BODY.elapsedTime > THIS_BODY_SPEC.parachutes[0].openingTime;
-
-    const bool time_from_detect_peak =
-        THIS_BODY_SPEC.parachutes[0].openingType == ParachuteOpeningType::TimeFromDetectPeak;
-
-    if ((detectpeak && detectpeakConditon) || (fixedtime && fixedtimeCondition)) {
-        THIS_BODY.parachuteOpened = true;
-    }
-
-    const bool time_from_detect_peakCondition =
-        THIS_BODY.elapsedTime - THIS_BODY.maxAltitudeTime > THIS_BODY_SPEC.parachutes[0].openingTime;
-
-    if (time_from_detect_peak) {
-        if (!THIS_BODY.waitForOpenPara && detectpeakConditon) {
-            THIS_BODY.waitForOpenPara = true;
-        }
-        if (THIS_BODY.waitForOpenPara && time_from_detect_peakCondition) {
-            THIS_BODY.parachuteOpened = true;
-            THIS_BODY.waitForOpenPara = false;
-        }
-    }
+		if (para.openingType & PARACHUTE_OPENING_TYPE_DETECT_PEAK) {
+			if (THIS_BODY.detectPeak && THIS_BODY.maxAltitude - THIS_BODY.pos.z >= para.openingHeight) {
+				THIS_BODY.parachuteOpenedList[i] = true;
+				THIS_BODY.anyParachuteOpened = true;
+			}
+		}
+		if (para.openingType & PARACHUTE_OPENING_TYPE_FIXED_TIME) {
+			if (THIS_BODY.elapsedTime >= para.openingTime) {
+				THIS_BODY.parachuteOpenedList[i] = true;
+				THIS_BODY.anyParachuteOpened = true;
+			}
+		}
+		if (para.openingType & PARACHUTE_OPENING_TYPE_TIME_FROM_DETECT_PEAK) {
+			if (THIS_BODY.detectPeak && (THIS_BODY.elapsedTime - THIS_BODY.maxAltitudeTime) >= para.openingTime) {
+				THIS_BODY.parachuteOpenedList[i] = true;
+				THIS_BODY.anyParachuteOpened = true;
+			}
+		}
+	}
 }
 
 bool Solver::updateDetachment() {
@@ -185,7 +183,7 @@ bool Solver::updateDetachment() {
         detachCondition = THIS_BODY.elapsedTime >= m_detachTime;
         break;
     case DetachType::SyncPara:
-        detachCondition = THIS_BODY.parachuteOpened == true;
+        detachCondition = THIS_BODY.anyParachuteOpened == true;
         break;
     case DetachType::DoNotDeatch:
         return false;
@@ -206,6 +204,7 @@ bool Solver::updateDetachment() {
             nextBody1.mass       = m_rocketSpec.bodySpec(m_currentBodyIndex + 1).massInitial;
             nextBody1.reflLength = m_rocketSpec.bodySpec(m_currentBodyIndex + 1).CGLengthInitial;
             nextBody1.iyz        = m_rocketSpec.bodySpec(m_currentBodyIndex + 1).rollingMomentInertiaInitial;
+			nextBody1.parachuteOpenedList.resize(m_rocketSpec.bodySpec(m_currentBodyIndex + 1).parachutes.size(), false);
 
             // receive power from the engine of the upper body for 0.2 seconds
             /*double sumThrust = 0;
@@ -219,6 +218,7 @@ bool Solver::updateDetachment() {
             nextBody2.mass       = m_rocketSpec.bodySpec(m_currentBodyIndex + 2).massInitial;
             nextBody2.reflLength = m_rocketSpec.bodySpec(m_currentBodyIndex + 2).CGLengthInitial;
             nextBody2.iyz        = m_rocketSpec.bodySpec(m_currentBodyIndex + 2).rollingMomentInertiaInitial;
+			nextBody2.parachuteOpenedList.resize(m_rocketSpec.bodySpec(m_currentBodyIndex + 2).parachutes.size(), false);
         }
 
         m_detachCount++;
@@ -232,32 +232,26 @@ bool Solver::updateDetachment() {
 void Solver::updateAerodynamicParameters() {
     THIS_BODY.airSpeed_b = (THIS_BODY.velocity - m_windModel->wind()).rotated(THIS_BODY.quat.conjugated());
 
-    THIS_BODY.attackAngle =
+	double alpha =
 		abs(atan2(sqrt(THIS_BODY.airSpeed_b.y * THIS_BODY.airSpeed_b.y + THIS_BODY.airSpeed_b.z * THIS_BODY.airSpeed_b.z), (THIS_BODY.airSpeed_b.x)));
+
+	double beta = (THIS_BODY.airSpeed_b.length() <= 1e-6) ? 0 : atan2(THIS_BODY.airSpeed_b.z, THIS_BODY.airSpeed_b.y);
 
     THIS_BODY.aeroCoef =
         THIS_BODY_SPEC.aeroCoefStorage.valuesIn(THIS_BODY.airSpeed_b.length(),
-                                                THIS_BODY.attackAngle,
+                                                alpha,
                                                 THIS_BODY_SPEC.engine.didCombustion(THIS_BODY.elapsedTime));
-
-    double alpha, beta;
-    if (THIS_BODY.airSpeed_b.length() <= 1e-6) {
-        alpha = 0;
-        beta  = 0;
-    }else{
-        alpha = atan2(THIS_BODY.airSpeed_b.z, THIS_BODY.airSpeed_b.x);
-        beta  = atan2(THIS_BODY.airSpeed_b.z, THIS_BODY.airSpeed_b.y);
-    }
 
     // NOTE:
     // We use absolute value of angle of attack when calculating aerodynamic coefficients.
-    // While this may seem counterintuitive at first, but it is necessary for calculating the contribution of pitch and yaw angles.
-    // The term Cna * |attackAngle| represents the magnitude of normal force coefficient,
+    // It is necessary for calculating the contribution of pitch and yaw angles.
+	// This value is not exact angle of attack, so that we represent it as alpha.
+    // The term Cna * |alpha| represents the magnitude of normal force coefficient,
     // allowing the pitch and yaw contributions—represented by the sideslip angle (beta)—
     // to be separated and used to compute Cnp and Cny accurately.
-    THIS_BODY.Cnp = THIS_BODY.aeroCoef.Cna * THIS_BODY.attackAngle * sin(beta);
-    THIS_BODY.Cny = THIS_BODY.aeroCoef.Cna * THIS_BODY.attackAngle * cos(beta);
-
+	THIS_BODY.attackAngle = -atan2(THIS_BODY.airSpeed_b.z, THIS_BODY.airSpeed_b.x); // By definition, only for logging
+    THIS_BODY.Cnp = THIS_BODY.aeroCoef.Cna * alpha * sin(beta);
+    THIS_BODY.Cny = THIS_BODY.aeroCoef.Cna * alpha * cos(beta);
     THIS_BODY.Cmqp = THIS_BODY_SPEC.Cmq;
     THIS_BODY.Cmqy = THIS_BODY_SPEC.Cmq;
 }
@@ -286,7 +280,23 @@ void Solver::updateExternalForce() {
     // Thrust
     THIS_BODY.force_b.x += THIS_BODY_SPEC.engine.thrustAt(THIS_BODY.elapsedTime, m_windModel->pressure());
 
-    if (!THIS_BODY.parachuteOpened) {
+    if (THIS_BODY.anyParachuteOpened) { // parachute opened
+		double CdS = 0.0;
+		for (auto idx = 0; idx < THIS_BODY_SPEC.parachutes.size(); idx++) {
+			if (THIS_BODY.parachuteOpenedList[idx]) {
+				CdS += THIS_BODY_SPEC.parachutes[idx].CdS;
+			}
+		}
+		Vector3D drag = - 0.5 * m_windModel->density() * THIS_BODY.airSpeed_b.length() * THIS_BODY.airSpeed_b * CdS;
+
+		THIS_BODY.force_b = drag;
+		THIS_BODY.moment_b = Vector3D(0, 0, 0);  // no moment from parachute
+
+		// Gravity
+		THIS_BODY.force_b +=
+			Vector3D(0, 0, -m_windModel->gravity()).rotated(THIS_BODY.quat.conjugated()) * THIS_BODY.mass;
+
+	} else { // before parachute opened
         // Aero
         const double preForceCalc = 0.5 * m_windModel->density() * THIS_BODY.airSpeed_b.length()
                                     * THIS_BODY.airSpeed_b.length() * THIS_BODY_SPEC.bottomArea;
@@ -330,18 +340,6 @@ void Solver::updateRocketDelta() {
             m_bodyDelta.omega_b = Vector3D();
             m_bodyDelta.quat    = Quaternion();
         }
-    } else if (THIS_BODY.parachuteOpened) {  // parachute opened
-		const double airspeed_normal = THIS_BODY.airSpeed_b.length();
-        Vector3D drag        = - 0.5 * m_windModel->density() * airspeed_normal * THIS_BODY.airSpeed_b
-                            * THIS_BODY_SPEC.parachutes[THIS_BODY.parachuteIndex].Cd;
-
-        m_bodyDelta.velocity = drag.rotated(THIS_BODY.quat) / THIS_BODY.mass;
-		m_bodyDelta.velocity.z -= m_windModel->gravity(); // add gravity
-
-        m_bodyDelta.pos = THIS_BODY.velocity;
-
-        m_bodyDelta.omega_b = Vector3D();
-        m_bodyDelta.quat    = Quaternion();
     } else if (THIS_BODY.pos.z < -10) {  // stop simulation
         m_bodyDelta.velocity = Vector3D();
     } else {  // flight
@@ -369,9 +367,10 @@ void Solver::applyDelta() {
     THIS_BODY.ix += m_bodyDelta.ix * m_dt;
     THIS_BODY.pos += m_bodyDelta.pos * m_dt;
     THIS_BODY.velocity += m_bodyDelta.velocity * m_dt;
-    THIS_BODY.omega_b += m_bodyDelta.omega_b * m_dt;
-    THIS_BODY.quat += m_bodyDelta.quat * m_dt;
-
+	if (!THIS_BODY.anyParachuteOpened) {
+		THIS_BODY.omega_b += m_bodyDelta.omega_b * m_dt;
+		THIS_BODY.quat += m_bodyDelta.quat * m_dt;
+	}
     THIS_BODY.quat = THIS_BODY.quat.normalized();
 
     THIS_BODY.elapsedTime += m_dt;
@@ -384,11 +383,6 @@ void Solver::organizeResult() {
                            THIS_BODY,
                            *m_windModel.get(),
                            THIS_BODY_SPEC.engine.isCombusting(THIS_BODY.elapsedTime));
-
-    if (THIS_BODY.maxAltitude < THIS_BODY.pos.z) {
-        THIS_BODY.maxAltitude     = THIS_BODY.pos.z;
-        THIS_BODY.maxAltitudeTime = THIS_BODY.elapsedTime;
-    }
 }
 
 void Solver::nextRocket() {

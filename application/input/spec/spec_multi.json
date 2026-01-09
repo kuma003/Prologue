@@ -29,9 +29,12 @@
     "Cd_f": 0.465,
     "Cna": 9.747,
     "Cmq": -3.0,
-    "vel_1st": 12,
-    "op_type_1st": 0,
-    "delay_time_1st": 0
+    "parachutes": [
+      {
+        "op_height": 0,
+        "CdS": 5.0
+      }
+    ]
   },
   "rocket3": {
     "ref_len": 0.7065,
@@ -47,12 +50,14 @@
     "Cd_f": 0.465,
     "Cna": 3.379,
     "Cmq": -3.0,
-    "vel_1st": 10,
-    "op_type_1st": 0,
-    "delay_time_1st": 0,
+    "parachutes": [
+      {
+        "op_height": 0,
+        "CdS": 7.0
+      }
+    ],
     "motor_file": "Sample_G40-4W.txt"
   },
-
   "environment": {
     "place": "nosiro_sea",
     "rail_len": 5.0,

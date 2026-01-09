@@ -7,6 +7,7 @@
 #include "AeroCoefficient.hpp"
 #include "math/Quaternion.hpp"
 #include "math/Vector3D.hpp"
+#include <vector>
 
 // Parameters of the part under simulation
 // subscript "_b" represent the variable is based on body coordinate
@@ -31,12 +32,13 @@ struct Body {
 
     // status
     double elapsedTime     = 0.0;  // [s]
-    size_t parachuteIndex  = 0;
-    bool parachuteOpened   = false;
-    bool waitForOpenPara   = false;
-    bool detectPeak        = false;
-    double maxAltitude     = 0;  // [m]
-    double maxAltitudeTime = 0;  // [s]
+    // size_t parachuteIndex  = 0;
+    // bool waitForOpenPara   = false;
+    bool anyParachuteOpened   = false;
+	std::vector<bool> parachuteOpenedList;
+	bool detectPeak        = false;
+    double maxAltitude     = -1.0;  // [m]
+    double maxAltitudeTime = -1.0;  // [s]
 
     // calculated
     Vector3D airSpeed_b;  // [m/s]

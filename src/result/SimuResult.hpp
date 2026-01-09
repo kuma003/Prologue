@@ -21,7 +21,7 @@ struct SimuResultStep {
     // Boolean
     bool launchClear     = false;
     bool combusting      = false;
-    bool parachuteOpened = false;
+    std::vector<bool> parachuteOpened = std::vector<bool>();
 
     // Air
     double air_density     = 0;

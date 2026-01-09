@@ -11,20 +11,18 @@
 #include "AeroCoefficient.hpp"
 #include "Engine.hpp"
 
-enum class ParachuteOpeningType : size_t {
-    DetectPeak = 0,
-    FixedTime,
-    TimeFromDetectPeak,
-};
+// Parachute opening type flag
+#define PARACHUTE_OPENING_TYPE_DETECT_PEAK           0x01
+#define PARACHUTE_OPENING_TYPE_FIXED_TIME            0x02
+#define PARACHUTE_OPENING_TYPE_TIME_FROM_DETECT_PEAK 0x04
 
 struct Parachute {
-    ParachuteOpeningType openingType;
-    double terminalVelocity;
+    unsigned char openingType; // PARACHUTE_OPENING_TYPE_*
     double openingTime;
     double delayTime;
     double openingHeight;
 
-    double Cd = 0;
+    double CdS = 0;
 };
 
 struct Transition {

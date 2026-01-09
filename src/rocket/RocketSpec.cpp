@@ -12,6 +12,8 @@
 #include "app/CommandLine.hpp"
 #include "misc/Constant.hpp"
 #include "utils/JsonUtils.hpp"
+#include "app/AppSetting.hpp"
+
 
 constexpr size_t AvailableBodyCount                = 3;
 constexpr const char* BodyList[AvailableBodyCount] = {"rocket1", "rocket2", "rocket3"};
@@ -60,21 +62,56 @@ void RocketSpecification::setBodySpecification(const boost::property_tree::ptree
 
     spec.Cmq = JsonUtils::GetValueExc<double>(pt, key + ".Cmq");
 
-    spec.parachutes.emplace_back(Parachute());
-    spec.parachutes[0].terminalVelocity = JsonUtils::GetValue<double>(pt, key + ".vel_1st");
-    spec.parachutes[0].openingType =
-        static_cast<ParachuteOpeningType>(JsonUtils::GetValue<int>(pt, key + ".op_type_1st"));
-    spec.parachutes[0].openingTime = JsonUtils::GetValue<double>(pt, key + ".op_time_1st");
-    spec.parachutes[0].delayTime   = JsonUtils::GetValue<double>(pt, key + ".delay_time_1st");
+    if (pt.get_child_optional(key + ".parachutes")) { // parachute
+        for (const auto& child : pt.get_child(key + ".parachutes")) {
+            double openingTime   = JsonUtils::GetValueWithDefault<double>(child.second, "op_time_from_launch", -1.0);
+            double delayTime     = JsonUtils::GetValueWithDefault<double>(child.second, "op_time_from_peak", -1.0);
+            double openingHeight = JsonUtils::GetValueWithDefault<double>(child.second, "op_height", -1.0);
 
-    if (spec.parachutes[0].terminalVelocity == 0.0) {
-        m_existInfCd = true;
-        CommandLine::PrintInfo(PrintInfoType::Warning,
-                               "Rocket: " + key,
-                               "Terminal velocity is undefined.",
-                               "Parachute Cd value is automatically calculated.");
-    } else {
-        spec.parachutes[0].Cd = CalcParachuteCd(spec.massFinal, spec.parachutes[0].terminalVelocity);
+            unsigned char openingType =
+                (openingTime >= 0.0 ? PARACHUTE_OPENING_TYPE_FIXED_TIME : 0x00) |
+                (delayTime >= 0.0 ? PARACHUTE_OPENING_TYPE_TIME_FROM_DETECT_PEAK : 0x00) |
+                (openingHeight >= 0.0 ? PARACHUTE_OPENING_TYPE_DETECT_PEAK : 0x00);
+
+            double CdS = JsonUtils::GetValueExc<double>(child.second, "CdS");
+
+            spec.parachutes.emplace_back(Parachute{
+                .openingType   = openingType,
+                .openingTime   = openingTime,
+                .delayTime     = delayTime,
+                .openingHeight = openingHeight,
+                .CdS           = CdS
+            });
+        }
+    }
+
+    if (spec.parachutes.size() == 0) {
+        // For backward compatibility
+
+        spec.parachutes.emplace_back(Parachute());
+        double terminalVelocity = JsonUtils::GetValue<double>(pt, key + ".vel_1st");
+        unsigned char op_type = JsonUtils::GetValue<unsigned char>(pt, key + ".op_type_1st");
+        if (op_type == 0) {
+            spec.parachutes[0].openingType = PARACHUTE_OPENING_TYPE_DETECT_PEAK;
+        } else if (op_type == 1) {
+            spec.parachutes[0].openingType = PARACHUTE_OPENING_TYPE_FIXED_TIME;
+        } else if (op_type == 2) {
+            spec.parachutes[0].openingType = PARACHUTE_OPENING_TYPE_TIME_FROM_DETECT_PEAK;
+        } else {
+            throw std::runtime_error("Invalid parachute opening type in rocket spec: " + key);
+        }
+        spec.parachutes[0].openingTime = JsonUtils::GetValue<double>(pt, key + ".op_time_1st");
+        spec.parachutes[0].delayTime   = JsonUtils::GetValue<double>(pt, key + ".delay_time_1st");
+        spec.parachutes[0].openingHeight = AppSetting::Simulation::detectPeakThreshold; // default value
+        if (terminalVelocity == 0.0) {
+            m_existInfCd = true;
+            CommandLine::PrintInfo(PrintInfoType::Warning,
+                                    "Rocket: " + key,
+                                    "Terminal velocity is undefined.",
+                                    "Parachute Cd value is automatically calculated.");
+        } else {
+            spec.parachutes[0].CdS = CalcParachuteCd(spec.massFinal, terminalVelocity);
+        }
     }
 
     // Initialize Engine
@@ -112,9 +149,9 @@ void RocketSpecification::setBodySpecification(const boost::property_tree::ptree
 
 void RocketSpecification::setInfParachuteCd() {
     for (size_t i = 0; i < m_bodySpecs.size(); i++) {
-        if (m_bodySpecs[i].parachutes[0].Cd == 0) {
+        if (m_bodySpecs[i].parachutes[0].CdS == 0) {
             for (int j = static_cast<int>(m_bodySpecs.size() - 1); j >= 0; j--) {
-                m_bodySpecs[i].parachutes[0].Cd += m_bodySpecs[j].parachutes[0].Cd;
+                m_bodySpecs[i].parachutes[0].CdS += m_bodySpecs[j].parachutes[0].CdS;
             }
         }
     }

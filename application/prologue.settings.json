@@ -6,7 +6,6 @@
 
   "simulation": {
     "dt": 0.001,
-    "detect_peak_threshold": 15.0,
 
     "scatter": {
       "wind_speed_min": 1.0,

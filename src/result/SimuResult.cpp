@@ -65,7 +65,7 @@ void SimuResultLogger::update(
         // Boolean
         step.launchClear     = rocket.launchClear;
         step.combusting      = combusting;
-        step.parachuteOpened = body.parachuteOpened;
+        step.parachuteOpened = body.parachuteOpenedList;
 
         // Air
         step.air_density     = windModel.density();

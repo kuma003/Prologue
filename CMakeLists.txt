@@ -31,6 +31,7 @@ include_directories(
 set(SOURCE_FILES
 	"src/app/AppSetting.cpp"
 	"src/app/CommandLine.cpp"
+	"src/app/FetchVersion.cpp"
 	"src/app/Option.cpp"
 
 	"src/dynamics/WindModel.cpp"

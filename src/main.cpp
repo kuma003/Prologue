@@ -9,6 +9,7 @@
 
 #include "app/AppSetting.hpp"
 #include "app/CommandLine.hpp"
+#include "app/FetchVersion.hpp"
 #include "app/Option.hpp"
 #include "misc/Platform.hpp"
 #include "simulator/SimulatorFactory.hpp"
@@ -19,6 +20,17 @@ void ShowSettingInfo();
 
 int main(int argc, char* argv[]) {
     std::cout << "Prologue v" << VERSION << std::endl;
+
+    const auto latest_version = FetchVersion::GetLatestVersionString();
+	if (latest_version != "N/A" && latest_version != VERSION) {
+		CommandLine::PrintInfo(PrintInfoType::Information,
+			"A newer version of Prologue is available: v" + latest_version + "."
+		);
+		CommandLine::PrintInfo(PrintInfoType::Information,
+			"Please visit https://github.com/FROM-THE-EARTH/Prologue/releases/latest for more information."
+		);
+	}
+
 
     const auto option = CommandLineOption::ParseArgs(argc, argv);
 

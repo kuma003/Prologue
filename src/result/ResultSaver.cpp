@@ -15,6 +15,17 @@
 
 #define WITH_COMMA(value) value << ','
 
+std::string Bits2String(const std::vector<bool>& bits) {
+	std::string result ;
+	result.reserve(bits.size() + 2);
+	result.push_back('"');
+	for (auto it = bits.end(); it != bits.begin(); --it) {
+		result += (*(it - 1) ? "1" : "0");
+	}
+	result.push_back('"');
+	return result;
+}
+
 namespace ResultSaver {
     const std::vector<std::string> headerDetail = {
         // general
@@ -88,7 +99,7 @@ namespace ResultSaver {
                 file << WITH_COMMA(step.gen_timeFromLaunch) << WITH_COMMA(step.gen_elapsedTime);
 
                 // boolean
-                file << WITH_COMMA(step.launchClear) << WITH_COMMA(step.combusting) << WITH_COMMA(step.parachuteOpened);
+                file << WITH_COMMA(step.launchClear) << WITH_COMMA(step.combusting) << WITH_COMMA(Bits2String(step.parachuteOpened));
 
                 // air
                 file << WITH_COMMA(step.air_density) << WITH_COMMA(step.air_gravity) << WITH_COMMA(step.air_pressure)

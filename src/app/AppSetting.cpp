@@ -32,6 +32,15 @@ namespace AppSetting {
             return JsonUtils::GetValueExc<T>(pt, key);
         }
 
+		template <typename T>
+		T initValueWithDefault(const std::string& key, const T& defaultValue) {
+			if (!initialized) {
+				boost::property_tree::read_json("prologue.settings.json", pt);
+				initialized = true;
+			}
+			return JsonUtils::GetValueWithDefault<T>(pt, key, defaultValue);
+		}
+
         size_t InitThreadCount() {
             const int count = Internal::InitValue<int>("processing.multi_thread_count");
             if (count < 1) {
@@ -110,7 +119,7 @@ namespace AppSetting {
     const size_t Processing::threadCount = Internal::InitThreadCount();
 
     const double Simulation::dt                  = Internal::InitValue<double>("simulation.dt");
-    const double Simulation::detectPeakThreshold = Internal::InitValue<double>("simulation.detect_peak_threshold");
+    const double Simulation::detectPeakThreshold = Internal::initValueWithDefault<double>("simulation.detect_peak_threshold", 0.0);
     const double Simulation::windSpeedMin        = Internal::InitValue<double>("simulation.scatter.wind_speed_min");
     const double Simulation::windSpeedMax        = Internal::InitValue<double>("simulation.scatter.wind_speed_max");
     const double Simulation::windDirInterval     = Internal::InitValue<double>("simulation.scatter.wind_dir_interval");

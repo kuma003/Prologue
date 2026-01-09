@@ -50,7 +50,7 @@ namespace JsonUtils {
     template <typename T>
     T GetValueWithDefault(const boost::property_tree::ptree& pt, const std::string& key, T defaultValue) {
         if (JsonUtils::HasValue<T>(pt, key)) {
-            JsonUtils::GetValue<T>(pt, key);
+            return JsonUtils::GetValue<T>(pt, key);
         } else {
             return defaultValue;
         }
